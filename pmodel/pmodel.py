@@ -1,9 +1,11 @@
 import json
 import logging
+import math
 import os
 from datetime import timedelta
 
 # import utm
+import numpy as np
 from numpy import array, pi, sign, tanh, tile
 from numpy.random import rand
 
@@ -56,83 +58,85 @@ def get_p_moist_fn(moist_model_code):
     p_moist_function = moist_models.get(moist_model_code, moist_proba_correction_1)
     return p_moist_function
 
-def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
+
+def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist,  w_dir, w_speed):
     # velocità di base modulata con la densità(tempo di attraversamento)
     dh = (dem_to - dem_from)
-    
-    v = v0[veg_from-1] / 60 # tempo in minuti di attraversamento di una cella
-    
-    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
-    
-    w_proj = np.cos(w_dir - angle_to) #wind component in propagation direction
-    w_spd = (w_speed * w_proj) / 3.6 #wind speed in the direction of propagation
 
-    teta_s_rad = np.arctan(dh / cellsize * dist) #slope angle [rad]
-    teta_s = np.degrees(teta_s_rad) #slope angle [°]
+    v = v0[veg_from - 1] / 60  # tempo in minuti di attraversamento di una cella
 
-    teta_f_rad = np.arctan(0.4226 * w_spd) #flame angle measured from the vertical in the direction of fire spread [rad]
-    teta_f = np.degrees(teta_f_rad) #flame angle [°]
-    
-    sf = np.exp(alpha1 * teta_s) #slope factor
-    sf_clip = np.clip(sf , 0.01 , 10) #slope factor clipped at 10
-    wf = np.exp(alpha2 * teta_f) #wind factor
-    wf_rescaled = wf / 13 #wind factor rescaled to have 10 as max value 
-    wf_clip = np.clip(wf_rescaled , 1 , 20) #max value is 20, min is 1
+    real_dist = np.sqrt((cellsize * dist) ** 2 + dh ** 2)
 
-    v_wh_pre = v * sf_clip * wf_clip #Rate of Spread evaluate with Rothermel's model
-    moist_eff = np.exp(c_moist * moist) #moisture effect
+    w_proj = np.cos(w_dir - angle_to)  # wind component in propagation direction
+    w_spd = (w_speed * w_proj) / 3.6  # wind speed in the direction of propagation
 
-    #v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
-    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS
+    teta_s_rad = np.arctan(dh / cellsize * dist)  # slope angle [rad]
+    teta_s = np.degrees(teta_s_rad)  # slope angle [°]
+
+    teta_f_rad = np.arctan(
+        0.4226 * w_spd)  # flame angle measured from the vertical in the direction of fire spread [rad]
+    teta_f = np.degrees(teta_f_rad)  # flame angle [°]
+
+    sf = np.exp(alpha1 * teta_s)  # slope factor
+    sf_clip = np.clip(sf, 0.01, 10)  # slope factor clipped at 10
+    wf = np.exp(alpha2 * teta_f)  # wind factor
+    wf_rescaled = wf / 13  # wind factor rescaled to have 10 as max value
+    wf_clip = np.clip(wf_rescaled, 1, 20)  # max value is 20, min is 1
+
+    v_wh_pre = v * sf_clip * wf_clip  # Rate of Spread evaluate with Rothermel's model
+    moist_eff = np.exp(c_moist * moist)  # moisture effect
+
+    # v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
+    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100)  # adoptable RoS
 
     t = real_dist / v_wh
-    t[t>=1] = np.around(t[t>=1])
+    t[t >= 1] = np.around(t[t >= 1])
     t = np.clip(t, 0.1, np.inf)
     return t
 
 def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
-  # velocità di base modulata con la densità(tempo di attraversamento)
+    # velocità di base modulata con la densità(tempo di attraversamento)
     dh = (dem_to - dem_from)
 
-    v = v0[veg_from-1] / 60 # tempo in minuti di attraversamento di una cella 
-    
-    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
-    
-    w_proj = np.cos(w_dir - angle_to) #wind component in propagation direction
-    w_spd = (w_speed * w_proj)/3.6 #wind speed in the direction of propagation
-	
-    teta_s_rad = np.arctan(dh / cellsize * dist) #slope angle [rad]
-    teta_s_pos = np.absolute(teta_s_rad) #absolute values of slope angle
-    p_reverse = np.sign(dh) # +1 if fire spreads upslope, -1 if fire spreads downslope
-	
-    wf = np.exp(beta1 * w_spd) #wind factor
-    wf_clip = np.clip(wf , 0.01 , 10) #clipped at 10
-    sf = np.exp(p_reverse * beta2 * np.tan(teta_s_pos)**beta3) #slope factor
-    sf_clip = np.clip(sf , 0.01 , 10)
+    v = v0[veg_from - 1] / 60  # tempo in minuti di attraversamento di una cella
 
-    v_wh_pre = v * wf_clip * sf_clip #Rate of Spread evaluate with Wang Zhengfei's model
-    moist_eff = np.exp(c_moist * moist) #moisture effect
-     
-    #v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
-    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS
-    
+    real_dist = np.sqrt((cellsize * dist) ** 2 + dh ** 2)
+
+    w_proj = np.cos(w_dir - angle_to)  # wind component in propagation direction
+    w_spd = (w_speed * w_proj) / 3.6  # wind speed in the direction of propagation
+
+    teta_s_rad = np.arctan(dh / cellsize * dist)  # slope angle [rad]
+    teta_s_pos = np.absolute(teta_s_rad)  # absolute values of slope angle
+    p_reverse = np.sign(dh)  # +1 if fire spreads upslope, -1 if fire spreads downslope
+
+    wf = np.exp(beta1 * w_spd)  # wind factor
+    wf_clip = np.clip(wf, 0.01, 10)  # clipped at 10
+    sf = np.exp(p_reverse * beta2 * np.tan(teta_s_pos) ** beta3)  # slope factor
+    sf_clip = np.clip(sf, 0.01, 10)
+
+    v_wh_pre = v * wf_clip * sf_clip  # Rate of Spread evaluate with Wang Zhengfei's model
+    moist_eff = np.exp(c_moist * moist)  # moisture effect
+
+    # v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
+    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100)  # adoptable RoS
+
     t = real_dist / v_wh
 
-    t[t>=1] = np.around(t[t>=1])
+    t[t >= 1] = np.around(t[t >= 1])
     t = np.clip(t, 0.1, np.inf)
     return t
 
 def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
     dh = (dem_to - dem_from)
-    v = v0[veg_from-1] / 60
+    v = v0[veg_from - 1] / 60
     wh = w_h_effect(angle_to, w_speed, w_dir, dh, dist)
-    moist_eff = np.exp(c_moist * moist) #moisture effect
-    #v_wh = np.clip(v * wh, 0.01, 100)
+    moist_eff = np.exp(c_moist * moist)  # moisture effect
+    # v_wh = np.clip(v * wh, 0.01, 100)
     v_wh = np.clip(v * wh * moist_eff, 0.01, 100)
 
-    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
+    real_dist = np.sqrt((cellsize * dist) ** 2 + dh ** 2)
     t = real_dist / v_wh
-    t[t>=1] = np.around(t[t>=1])
+    t[t >= 1] = np.around(t[t >= 1])
     t = np.clip(t, 0.1, np.inf)
     return t
 
@@ -140,14 +144,13 @@ def w_h_effect(angle_to, w_speed, w_dir, dh, dist):
     w_effect_module = (A + (D1 * (D2 * np.tanh((w_speed / D3) - D4))) + (w_speed / D5))
     a = (w_effect_module - 1) / 4
     w_effect_on_direction = (a + 1) * (1 - a ** 2) / (1 - a * np.cos(normalize(w_dir - angle_to)))
-    #h_effect = 1 + (tanh((dh / 7) ** 2. * sign(dh)))
-    slope = dh/(cellsize*dist)
-    h_effect = 2**((tanh((slope * 3) ** 2. * sign(slope))))
+    # h_effect = 1 + (tanh((dh / 7) ** 2. * sign(dh)))
+    slope = dh / (cellsize * dist)
+    h_effect = 2 ** ((tanh((slope * 3) ** 2. * sign(slope))))
 
     w_h = h_effect * w_effect_on_direction
-    #w_h = np.clip(w_h, 0.1, np.Inf)
+    # w_h = np.clip(w_h, 0.1, np.Inf)
     return w_h
-
 
 def w_h_effect_on_p(angle_to, w_speed, w_dir, dh, dist_to):
     """
@@ -156,23 +159,22 @@ def w_h_effect_on_p(angle_to, w_speed, w_dir, dh, dist_to):
     w_speed_norm = np.clip(w_speed, 0, 60)
     wh_orig = w_h_effect(angle_to, w_speed_norm, w_dir, dh, dist_to)
     wh = wh_orig - 1.0
-    wh[wh > 0] = wh[wh > 0]/2.13
-    wh[wh < 0] = wh[wh < 0]/1.12
+    wh[wh > 0] = wh[wh > 0] / 2.13
+    wh[wh < 0] = wh[wh < 0] / 1.12
     wh += 1.0
     return wh
-
 
 def p_probability(self, dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moist, w_dir, w_speed):
     dh = (dem_to - dem_from)
     alpha_wh = w_h_effect_on_p(angle_to, w_speed, w_dir, dh, dist_to)
-    
-    #p_moist = 1
-    p_moist = self.p_moist(moist)  #era self.p_moist
-    #p_moist = M1 * moist**3 + M2 * moist**2 + M3 * moist + M4
-    p_m = np.clip(p_moist , 0, 1.0)
+
+    # p_moist = 1
+    p_moist = self.p_moist(moist)  # era self.p_moist
+    # p_moist = M1 * moist**3 + M2 * moist**2 + M3 * moist + M4
+    p_m = np.clip(p_moist, 0, 1.0)
     p_veg = prob_table[veg_to - 1, veg_from - 1]
-    p = 1-(1-p_veg)**alpha_wh
-    #p_clip = np.clip(p, 0, 1.0)
+    p = 1 - (1 - p_veg) ** alpha_wh
+    # p_clip = np.clip(p, 0, 1.0)
     p_clip = np.clip(p * p_m, 0, 1.0)
 
     return p_clip
@@ -249,6 +251,7 @@ class Pmodel:
         self.p_moist = settings.p_moist_fn #print("p_moist is ...", self.p_moist)
         # make it configurable
         self.dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
+
 
     def __preprocess_bc(self, boundary_conditions):
         for bc in boundary_conditions:
@@ -356,6 +359,29 @@ class Pmodel:
                     logging.error('Error reading input files')
                     raise
 
+    # # code rows to generate uniform wind field
+    # def load_data_from_files_wind(self, wind_speed_filename, wind_direction_filename):
+    #     if True:
+    #         self.w_dir = np.ones_like(self.dem)*180
+    #         self.w_dir = normalize((180 - self.w_dir + 90) * np.pi / 180)
+    #         self.w_vel = np.ones_like(self.dem)*10
+
+    #      #   return
+
+    def load_data_from_files_wind(self, wind_speed_filename, wind_direction_filename):
+
+        with rio.open(wind_speed_filename) as w_vel_file, rio.open(wind_direction_filename) as w_dir_file:
+            self.__check_input_files_consistency(w_dir_file, w_vel_file)
+            try:
+                self.w_vel = w_vel_file.read(1).astype('float')
+                wind_dir_raster = w_dir_file.read(1).astype('float')
+                self.w_dir = normalize((180 - wind_dir_raster + 90) * np.pi / 180)
+
+            except IOError:
+                logging.error('Error reading input files')
+                raise
+
+
     def load_data_from_tiles(self, easting, northing, zone_number):
         try:
             logging.info('Loading VEGETATION from "' + self.settings.tileset + '" tileset')
@@ -408,7 +434,7 @@ class Pmodel:
     def __update_isochrones(self, isochrones, values, dst_trans):
         isochrones[self.c_time] = extract_isochrone(
                 values, dst_trans,
-                thresholds=[0, 0.5, 0.75, 0.9],
+                thresholds=[0, 0.1, 0.25, 0.5, 0.75, 0.9],
         )
 
     def __write_isochrones(self, isochrones):
@@ -417,17 +443,17 @@ class Pmodel:
         save_isochrones(isochrones, isochrone_path, format='geojson')
 
 
-    def __apply_updates(self, updates, w_speed, w_dir, moisture):
+    def __apply_updates(self, updates, moisture):
         # coordinates of the next updates
         bc = self.__find_bc()
-        u = np.vstack(updates)
+        u = np.vstack(updates) # [riga, colonna, indice simulazione]
         veg_type = self.veg[u[:, 0], u[:, 1]]
         mask = np.logical_and(
             veg_type != 0,
             self.f_global[u[:, 0], u[:, 1], u[:, 2]] == 0
         )
 
-        r, c, t = u[mask, 0], u[mask, 1], u[mask, 2]
+        r, c, t = u[mask, 0], u[mask, 1], u[mask, 2] # t represents "n_threads"
         self.f_global[r, c, t] = 1
 
         #veg type modified due to the heavy fighting actions
@@ -436,8 +462,8 @@ class Pmodel:
             for heavyy in heavy_acts:
                 self.veg[ heavyy[0] , heavyy[1] ] = 0 #da scegliere se mettere a 0 (impossibile che propaghi) 3 (non veg, quindi prova a propagare ma non riesce) o 7(faggete, quindi propaga con bassissima probabilità)
         
-        nb_num = n_arr.shape[0]
-        from_num = r.shape[0]
+        nb_num = n_arr.shape[0] # number of directions of the burning cell
+        from_num = r.shape[0] # number of cells which are burning
 
         nb_arr_r = tile(n_arr[:, 0], from_num)
         nb_arr_c = tile(n_arr[:, 1], from_num)
@@ -446,14 +472,22 @@ class Pmodel:
         nc = c.repeat(nb_num) + nb_arr_c
         nt = t.repeat(nb_num)
 
-        #let's apply a random noise to wind direction and speed for all the cells
-        w_dir_r = (w_dir + (pi/16)*(0.5 - rand(from_num))).repeat(nb_num)
-        w_speed_r = (w_speed * (1.2 - 0.4 * rand(from_num))).repeat(nb_num)
-  
         dem_from = self.dem[r, c].repeat(nb_num)
         veg_from = self.veg[r, c].repeat(nb_num)
         veg_to = self.veg[nr, nc]
         dem_to = self.dem[nr, nc]
+
+        # data transformed into radiants and rotated in order to have data referred to direction of origin of wind
+        # same convention on direction between WindNinja and Propagator
+        w_s = self.w_vel[nr, nc]
+        w_d = self.w_dir[nr, nc]
+
+        # at each time step wind field is perturbed with random noise
+        wind_direction_r = w_d
+        wind_speed_r = w_s
+        # wind_direction_r = (w_d + (pi/16)*(0.5 - rand(w_d.shape[0])))
+        # wind_speed_r = (w_s*(1.2 - 0.4*rand(w_d.shape[0])))
+
         moisture_r = moisture[nr, nc]
         angle_to = angle[nb_arr_r+1, nb_arr_c+1]
         dist_to = dist[nb_arr_r+1, nb_arr_c+1]
@@ -466,15 +500,15 @@ class Pmodel:
         veg_to = veg_to[n_mask]
         angle_to = angle_to[n_mask]
         dist_to = dist_to[n_mask]
-        w_speed_r = w_speed_r[n_mask]
-        w_dir_r = w_dir_r[n_mask]
+        wind_speed_r = wind_speed_r[n_mask]
+        wind_direction_r = wind_direction_r[n_mask]
         moisture_r = moisture_r[n_mask]
         
 
         nr, nc, nt = nr[n_mask], nc[n_mask], nt[n_mask]
 
         # get the probability for all the pixels
-        p_prob = p_probability(self,dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moisture_r, w_dir_r, w_speed_r)
+        p_prob = p_probability(self, dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moisture_r, wind_direction_r, wind_speed_r)
 
         # try the propagation
         p = p_prob > rand(p_prob.shape[0])
@@ -489,7 +523,7 @@ class Pmodel:
                                     veg_from[p], veg_to[p],
                                     angle_to[p], dist_to[p],
                                     moisture_r[p],
-                                    w_dir_r[p], w_speed_r[p])
+                                    wind_direction_r[p], wind_speed_r[p])
 
         ###### fire spotting    ----> FROM HERE
         ##################################################
@@ -509,7 +543,7 @@ class Pmodel:
             conifer_arr_t = conifer_t.repeat(repeats=N_embers)
             # calculate angle and distance
             ember_angle = np.random.uniform(0 , 2.0*np.pi, size=conifer_arr_r.shape)
-            ember_distance  = fire_spotting(ember_angle,  w_dir, w_speed)  
+            ember_distance  = fire_spotting(ember_angle, self.w_dir, self.vel)
 
             # filter out short embers
             idx_long_embers = ember_distance > 2*cellsize
@@ -560,7 +594,7 @@ class Pmodel:
                             self.veg[nr_spot, nc_spot], self.veg[nr_spot, nc_spot],   #dh=0 (no slope) and veg_from=veg_to to simplify the phenomenon
                             np.zeros(nr_spot.shape), cellsize*np.ones(nr_spot.shape), #ember_angle, ember_distance, 
                             moisture[nr_spot, nc_spot],
-                            w_dir, w_speed)
+                            self.w_dir, self.w_vel)
             
             p_nr = np.append( p_nr , nr_spot)               #row-coordinates of the "spotted cells" added to the other ones
             p_nc = np.append( p_nc , nc_spot)               #column-coordinates of the "spotted cells" added to the other ones
@@ -706,9 +740,10 @@ class Pmodel:
                 break
 
             bc = self.__find_bc()
-            w_dir_deg = float(bc.get(W_DIR_TAG, 0))
-            wdir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
-            wspeed = float(bc.get(W_SPEED_TAG, 0))
+            #w_dir_deg = float(bc.get(W_DIR_TAG, 0)) # degree data
+            #wdir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
+            # data transformed into radiants and rotated in order to have data referred to direction of origin of wind
+            #wspeed = float(bc.get(W_SPEED_TAG, 0))
             
             moisture = bc.get(MOIST_RASTER_TAG, None)
 
@@ -716,7 +751,7 @@ class Pmodel:
 
             self.c_time, updates = self.ps.pop()
             
-            new_updates = self.__apply_updates(updates, wspeed, wdir, moisture)
+            new_updates = self.__apply_updates(updates, moisture)
             self.ps.push_all(new_updates)
             
 

@@ -71,6 +71,16 @@ def parse_params():
         help='Vegetation tiff file to load'
     )
 
+    # creazione di nuovi 'argument' per wind speed e wind direction
+    parser.add_argument('-w_vel',
+        dest='w_vel_file',
+        help='wind velocity ASCII file to load'
+    )
+    parser.add_argument('-w_dir',
+        dest='w_dir_file',
+        help='wind direction ASCII file to load'
+    )
+
     parser.add_argument('-spo',
         dest='do_spot',
         action='store_true', 

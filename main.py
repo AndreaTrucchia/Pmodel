@@ -54,9 +54,9 @@ def main():
     if ros_model_code not in [DEFAULT_TAG , WANG_TAG , ROTHERMEL_TAG]:
         logging.info('WARNING: RoS function is not well defined, the model will use "wang" configuration')
 
-    w_dir_deg = float(d.get(W_DIR_TAG, 0))
-    w_dir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
-    w_speed = float(d.get(W_SPEED_TAG, 0))
+    # w_dir_deg = float(d.get(W_DIR_TAG, 0))
+    # w_dir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
+    # w_speed = float(d.get(W_SPEED_TAG, 0))
     moisture_100 = int(d.get(MOISTURE_TAG, 0))
     waterline_actions_fixed = d.get(WATERLINE_ACTION_TAG, None) #waterline actions means fire fighting actions made by the use of water
     if waterline_actions_fixed == 0:
@@ -85,8 +85,8 @@ def main():
     time_resolution = float(d.get(TIME_RESOLUTION_TAG, 60))
 
     boundary_conditions = d.get(BOUNDARY_CONDITIONS_TAG, [{
-        "w_dir": w_dir,
-        "w_speed": w_speed,
+        #"w_dir": w_dir,
+        #"w_speed": w_speed,
         "moisture": moisture_100,
         "waterline_action": waterline_actions,
         "canadair": canadair,
@@ -176,7 +176,7 @@ def main():
 
 # we pass the flag for the spotting model. the value from input line (args)
 #  can be overrided by the SPOT_FLAG_TAG inside of the input params json...
-    do_spotting = False 
+    do_spotting = False
     
     if args.do_spot is not None:
         do_spotting = args.do_spot
@@ -216,8 +216,13 @@ def main():
        
         sim.load_data_from_files(args.veg_file, args.dem_file)
 
+        # inserisco anche la funzione per i dati del vento
+        sim.load_data_from_files_wind(args.w_vel_file, args.w_dir_file)
+
     sim.init_ignitions(polys_ign, lines_ign, points_ign, zone_number_ign)
     sim.run()
+    print(sim.w_dir)
+    print(sim.w_vel)
     logging.info('completed')
 
 
