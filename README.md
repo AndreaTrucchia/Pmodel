@@ -1,7 +1,7 @@
 # Pmodel
-Cellular Automata for wildfire propagation
+Cellular Automata for wildfire propagation. This is the numerical core of PROPAGATOR wildfire simulator developed by CIMA Foundation.
 
+See for more info: 
 https://www.mdpi.com/2571-6255/3/3/26
 
-
- [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+See Licencse.md for information about the license. 
